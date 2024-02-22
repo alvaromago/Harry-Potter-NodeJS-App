@@ -4,11 +4,15 @@ const conexion = new MongoClient(urlConexion);
 const http = require("http");
 const url = require("url");
 const fs = require("fs");
-const path = require("path");
 const server = http.createServer();
 
 const db = "harry";
 const collection = "personajes";
+const todos = document.getElementById("todos");
+const humanos = document.getElementById("humanos");
+const anio = document.getElementById("anio");
+const holly = document.getElementById("holly");
+const estudiantes = document.getElementById("estudiantes");
 
 server.on("request", function (peticion, respuesta) {
 	let urlCompleta = url.parse(peticion.url, true);
@@ -27,7 +31,23 @@ server.on("request", function (peticion, respuesta) {
 		respuesta.write("<h1>Datos introducidos correctamente</h1>");
 		respuesta.end();
 	} else if (pathname == "/consultar") {
-		consultar(db, collection, respuesta);
+		consultarTodos(db, collection, respuesta);
+
+		todos.addEventListener("click", function () {
+			consultarTodos(db, collection, respuesta);
+		});
+		humanos.addEventListener("click", function () {
+			consultarF1(db, collection, respuesta);
+		});
+		anio.addEventListener("click", function () {
+			consultarF2(db, collection, respuesta);
+		});
+		holly.addEventListener("click", function () {
+			consultarF3(db, collection, respuesta);
+		});
+		estudiantes.addEventListener("click", function () {
+			consultarF4(db, collection, respuesta);
+		});
 	} else {
 		respuesta.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
 		respuesta.write("<h1>URL Incorrecta</h1>");
@@ -38,7 +58,7 @@ server.on("request", function (peticion, respuesta) {
 server.listen(8080, "127.0.0.1");
 console.log("Servidor corriendo en localhost:8080");
 
-// Insertar datos
+// Insertar JSON
 async function insertar(datos, db, collection) {
 	await conexion.connect();
 	const dbo = conexion.db(db);
@@ -56,13 +76,71 @@ async function eliminarColeccion() {
 	console.log(result);
 }
 
-// Consultar
-async function consultar(db, collection, respuesta) {
+// Consultar todos
+async function consultarTodos(db, collection, respuesta) {
 	await conexion.connect();
 	const dbo = conexion.db(db);
 
 	let salida = "";
 	let resultado = await dbo.collection(collection).find({}).toArray();
+	salida = crearHTML(resultado);
+	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+	respuesta.write(salida);
+	respuesta.end();
+}
+
+// Consultar Filtro 1 (Humanos)
+async function consultarF1(db, collection, respuesta) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+
+	let salida = "";
+	let resultado = await dbo.collection(collection).find({ species: "human" }).toArray();
+	salida = crearHTML(resultado);
+	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+	respuesta.write(salida);
+	respuesta.end();
+}
+
+// Consultar Filtro 2 (< 1979)
+async function consultarF2(db, collection, respuesta) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+
+	let salida = "";
+	let resultado = await dbo
+		.collection(collection)
+		.find({ yearOfBirth: { $lt: 1979 } })
+		.toArray();
+	salida = crearHTML(resultado);
+	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+	respuesta.write(salida);
+	respuesta.end();
+}
+
+// Consultar Filtro 3 (Holly)
+async function consultarF3(db, collection, respuesta) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+
+	let salida = "";
+	let resultado = await dbo.collection(collection).find({ "wand.wood": "holly" }).toArray();
+	salida = crearHTML(resultado);
+	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+	respuesta.write(salida);
+	respuesta.end();
+}
+
+// Consultar Filtro 4 (Estudiantes vivos)
+async function consultarF4(db, collection, respuesta) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+
+	let salida = "";
+	let resultado = await dbo
+		.collection(collection)
+		.find({ $and: [{ alive: true }, { hogwartsStudent: true }] })
+		.toArray();
 	salida = crearHTML(resultado);
 	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
 	respuesta.write(salida);
@@ -79,8 +157,16 @@ function crearHTML(datosTabla) {
         </head>
         <body>
             <div class="container-fluid">
+				<h1 class="text-center pt-5 pb-2">Práctica Tema 4 DWS</h1>
+				<h3 class="text-center pb-4" style="opacity:.7;color:crimson;">Personajes Harry Potter</h3>
+				<div class="container text-center">
+					<a class="btn btn-success" id="todos">Todos</a>
+					<a class="btn btn-success" id="humanos">Humanos</a>
+					<a class="btn btn-success" id="anio">< 1979</a>
+					<a class="btn btn-success" id="holly">Holly</a>
+					<a class="btn btn-success" id="estudiantes">Estudiantes vivos</a>
+				</div>
                 <div class="container py-5">
-                    <h1 class="text-center">Personajes Harry Potter</h1>
                     <table class="table">
                     <thead>
                     <tr>
