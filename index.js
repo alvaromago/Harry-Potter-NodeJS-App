@@ -136,17 +136,9 @@ async function consultarF4(db, collection, respuesta) {
 }
 
 // Borrar
-async function borrarRegistro(db, collection) {
+async function borrarRegistro() {
 	await conexion.connect();
 	const dbo = conexion.db(db);
-	let salida = "";
-
-	let filtro = {};
-	let resultado = await dbo.collection(collection).deleteOne(filtro);
-	salida = crearHTML(resultado);
-	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-	respuesta.write(salida);
-	respuesta.end();
 }
 
 function crearHTML(datosTabla) {
@@ -189,7 +181,6 @@ function crearHTML(datosTabla) {
 		let genero = "";
 		let casa = "";
 		let anoNacimiento = 0;
-		let id = datosTabla[i]._id;
 
 		if (datosTabla[i].image != null) {
 			imagen = datosTabla[i].image;
@@ -210,20 +201,15 @@ function crearHTML(datosTabla) {
 			anoNacimiento = datosTabla[i].yearOfBirth;
 		}
 
-		contenido +=
-			"<tr><td>" +
-			imagen +
-			"</td><td>" +
-			nombre +
-			"</td><td>" +
-			especie +
-			"</td><td>" +
-			genero +
-			"</td><td>" +
-			casa +
-			"</td><td>" +
-			anoNacimiento +
-			`</td><td><a class='btn btn-danger btn-sm'">Borrar</a></tr>`;
+		contenido += `<tr>
+        	<td>${imagen}</td>
+        	<td>${nombre}</td>
+        	<td>${especie}</td>
+        	<td>${genero}</td>
+        	<td>${casa}</td>
+        	<td>${anoNacimiento}</td>
+        	<td><a class="btn btn-danger btn-sm btn-borrar">Borrar</a></td>
+    	</tr>`;
 	}
 
 	contenido += `      </tbody>
