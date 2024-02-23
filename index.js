@@ -139,6 +139,10 @@ async function consultarF4(db, collection, respuesta) {
 async function borrarRegistro() {
 	await conexion.connect();
 	const dbo = conexion.db(db);
+
+	let filtro = {};
+	let resultado = await dbo.collection(collection).deleteOne(filtro); // .updateMany para todos los registros
+	console.log(resultado);
 }
 
 function crearHTML(datosTabla) {
@@ -208,7 +212,7 @@ function crearHTML(datosTabla) {
         	<td>${genero}</td>
         	<td>${casa}</td>
         	<td>${anoNacimiento}</td>
-        	<td><a class="btn btn-danger btn-sm btn-borrar">Borrar</a></td>
+        	<td><a class="btn btn-danger btn-sm">Borrar</a></td>
     	</tr>`;
 	}
 
