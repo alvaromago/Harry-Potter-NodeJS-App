@@ -4,15 +4,11 @@ const conexion = new MongoClient(urlConexion);
 const http = require("http");
 const url = require("url");
 const fs = require("fs");
+const { connect } = require("http2");
 const server = http.createServer();
 
 const db = "harry";
 const collection = "personajes";
-const todos = document.getElementById("todos");
-const humanos = document.getElementById("humanos");
-const anio = document.getElementById("anio");
-const holly = document.getElementById("holly");
-const estudiantes = document.getElementById("estudiantes");
 
 server.on("request", function (peticion, respuesta) {
 	let urlCompleta = url.parse(peticion.url, true);
@@ -32,22 +28,14 @@ server.on("request", function (peticion, respuesta) {
 		respuesta.end();
 	} else if (pathname == "/consultar") {
 		consultarTodos(db, collection, respuesta);
-
-		todos.addEventListener("click", function () {
-			consultarTodos(db, collection, respuesta);
-		});
-		humanos.addEventListener("click", function () {
-			consultarF1(db, collection, respuesta);
-		});
-		anio.addEventListener("click", function () {
-			consultarF2(db, collection, respuesta);
-		});
-		holly.addEventListener("click", function () {
-			consultarF3(db, collection, respuesta);
-		});
-		estudiantes.addEventListener("click", function () {
-			consultarF4(db, collection, respuesta);
-		});
+	} else if (pathname == "/humanos") {
+		consultarF1(db, collection, respuesta);
+	} else if (pathname == "/anioDeNacimiento") {
+		consultarF2(db, collection, respuesta);
+	} else if (pathname == "/holly") {
+		consultarF3(db, collection, respuesta);
+	} else if (pathname == "/estudiantesVivos") {
+		consultarF4(db, collection, respuesta);
 	} else {
 		respuesta.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
 		respuesta.write("<h1>URL Incorrecta</h1>");
@@ -147,6 +135,20 @@ async function consultarF4(db, collection, respuesta) {
 	respuesta.end();
 }
 
+// Borrar
+async function borrarRegistro(db, collection) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+	let salida = "";
+
+	let filtro = {};
+	let resultado = await dbo.collection(collection).deleteOne(filtro);
+	salida = crearHTML(resultado);
+	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+	respuesta.write(salida);
+	respuesta.end();
+}
+
 function crearHTML(datosTabla) {
 	let contenido = `<html lang="es">
         <head>
@@ -160,11 +162,11 @@ function crearHTML(datosTabla) {
 				<h1 class="text-center pt-5 pb-2">Práctica Tema 4 DWS</h1>
 				<h3 class="text-center pb-4" style="opacity:.7;color:crimson;">Personajes Harry Potter</h3>
 				<div class="container text-center">
-					<a class="btn btn-success" id="todos">Todos</a>
-					<a class="btn btn-success" id="humanos">Humanos</a>
-					<a class="btn btn-success" id="anio">< 1979</a>
-					<a class="btn btn-success" id="holly">Holly</a>
-					<a class="btn btn-success" id="estudiantes">Estudiantes vivos</a>
+					<a class="btn btn-success" href="/consultar">Todos</a>
+					<a class="btn btn-success" href="/humanos">Humanos</a>
+					<a class="btn btn-success" href="/anioDeNacimiento">< 1979</a>
+					<a class="btn btn-success" href="/holly">Holly</a>
+					<a class="btn btn-success" href="/estudiantesVivos">Estudiantes vivos</a>
 				</div>
                 <div class="container py-5">
                     <table class="table">
@@ -175,7 +177,8 @@ function crearHTML(datosTabla) {
                         <th>Especie</th>
                         <th>Género</th>
                         <th>Casa</th>
-                        <th>Año Nacimiento</th></tr>
+                        <th>Año Nacimiento</th>
+						<th>Borrar</th></tr>
                     </thead>
                     <tbody>`;
 
@@ -186,6 +189,7 @@ function crearHTML(datosTabla) {
 		let genero = "";
 		let casa = "";
 		let anoNacimiento = 0;
+		let id = datosTabla[i]._id;
 
 		if (datosTabla[i].image != null) {
 			imagen = datosTabla[i].image;
@@ -219,7 +223,7 @@ function crearHTML(datosTabla) {
 			casa +
 			"</td><td>" +
 			anoNacimiento +
-			"</td></tr>";
+			`</td><td><a class='btn btn-danger btn-sm'">Borrar</a></tr>`;
 	}
 
 	contenido += `      </tbody>
