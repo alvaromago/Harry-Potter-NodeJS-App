@@ -72,7 +72,7 @@ server.on("request", async function (peticion, respuesta) {
 	} else if (pathname.startsWith("/eliminar/")) {
 		let id = pathname.split("/")[2]; // Obtiene el ID a través de la URL
 		await eliminarPersonaje(id, respuesta);
-	} else if (pathname == "/eliminarPersonaje") {
+	} else if (pathname == "/insertarPersonaje") {
 		let datos = "";
 		peticion.on("data", (chunk) => {
 			datos += chunk;
