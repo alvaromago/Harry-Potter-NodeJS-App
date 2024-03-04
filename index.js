@@ -1,227 +1,181 @@
-const { MongoClient } = require("mongodb");
-const urlConexion = "mongodb://127.0.0.1:27017";
-const conexion = new MongoClient(urlConexion);
 const http = require("http");
 const url = require("url");
 const fs = require("fs");
-const { connect } = require("http2");
-const server = http.createServer();
+const { MongoClient, ObjectId } = require("mongodb");
+
+const urlConexion = "mongodb://127.0.0.1:27017";
+const conexion = new MongoClient(urlConexion);
 
 const db = "harry";
 const collection = "personajes";
 
-server.on("request", function (peticion, respuesta) {
+const server = http.createServer();
+server.on("request", async function (peticion, respuesta) {
 	let urlCompleta = url.parse(peticion.url, true);
 	let pathname = urlCompleta.pathname;
 
+	respuesta.setHeader("Access-Control-Allow-Origin", "*");
+	respuesta.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+
 	if (pathname == "/importar") {
-		eliminarColeccion().then(console.log).catch(console.error);
-
+		// Elimina todos los registros antes de importar
+		await eliminar();
 		fs.readFile("harry-potter-characters.json", function (err, datos) {
+			if (err) {
+				respuesta.writeHead(404, { "Content-Type": "text/html" });
+				respuesta.write("<h1>Error al cargar el JSON</h1>");
+				respuesta.end();
+				return;
+			}
 			let datosJSON = JSON.parse(datos);
-			// Insertar JSON
-			insertar(datosJSON, db, collection).then(console.log).catch(console.error);
-		});
 
-		respuesta.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-		respuesta.write("<h1>Datos introducidos correctamente</h1>");
-		respuesta.end();
+			insertar(datosJSON, db, collection)
+				.catch(console.error)
+				.finally(() => conexion.close());
+
+			respuesta.writeHead(404, {
+				"Content-Type": "text/html; charset=utf-8",
+			});
+			respuesta.write("<h1>Base de datos y colección creada</h1>");
+			respuesta.end();
+		});
 	} else if (pathname == "/consultar") {
-		consultarTodos(db, collection, respuesta);
-	} else if (pathname == "/humanos") {
-		consultarF1(db, collection, respuesta);
-	} else if (pathname == "/anioDeNacimiento") {
-		consultarF2(db, collection, respuesta);
-	} else if (pathname == "/holly") {
-		consultarF3(db, collection, respuesta);
-	} else if (pathname == "/estudiantesVivos") {
-		consultarF4(db, collection, respuesta);
+		if (peticion.method === "POST") {
+			let datos = [];
+			peticion.on("data", (chunk) => {
+				datos.push(chunk);
+			});
+			peticion.on("end", () => {
+				mostrarTodo(db, collection, respuesta);
+			});
+		} else {
+			fs.readFile("index.html", function (err, datos) {
+				if (err) {
+					respuesta.writeHead(404, { "Content-Type": "text/html" });
+					respuesta.write("<h1>Error al cargar el archivo HTML</h1>");
+					respuesta.end();
+					return;
+				}
+				respuesta.writeHead(200, { "Content-Type": "text/html" });
+				respuesta.write(datos);
+				respuesta.end();
+			});
+		}
+	} else if (pathname == "/filtro1") {
+		filtroBasico("species", "human", respuesta);
+	} else if (pathname == "/filtro2") {
+		filtroBasico("yearOfBirth", { $lt: 1979 }, respuesta);
+	} else if (pathname == "/filtro3") {
+		filtroBasico("wand.wood", "holly", respuesta);
+	} else if (pathname == "/filtro4") {
+		filtroComplejo(respuesta);
+	} else if (pathname.startsWith("/eliminar/")) {
+		let id = pathname.split("/")[2]; // Obtiene el ID a través de la URL
+		await eliminarPersonaje(id, respuesta);
+	} else if (pathname == "/eliminarPersonaje") {
+		let datos = "";
+		peticion.on("data", (chunk) => {
+			datos += chunk;
+		});
+		peticion.on("end", () => {
+			const nuevoPersonaje = JSON.parse(datos);
+			eliminarPersonaje(nuevoPersonaje, respuesta);
+		});
 	} else {
 		respuesta.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-		respuesta.write("<h1>URL Incorrecta</h1>");
+		respuesta.write("<h1>URL incorrecta</h1>");
 		respuesta.end();
 	}
 });
 
-server.listen(8080, "127.0.0.1");
-console.log("Servidor corriendo en localhost:8080");
-
-// Insertar JSON
+// Crea la BD e importar datos del JSON
 async function insertar(datos, db, collection) {
 	await conexion.connect();
 	const dbo = conexion.db(db);
-	// La variable datos guarda los datosJSON
-	let resultado = await dbo.collection(collection).insertMany(datos);
-	console.log("Datos insertados", resultado);
+
+	await dbo.collection(collection).insertMany(datos);
 }
 
-// Eliminar colección
-async function eliminarColeccion() {
+// Elimina la BD y colección
+async function eliminar() {
 	await conexion.connect();
 	const dbo = conexion.db(db);
 
-	let result = await dbo.collection(collection).drop();
-	console.log(result);
+	await dbo.collection(collection).drop();
 }
 
-// Consultar todos
-async function consultarTodos(db, collection, respuesta) {
-	await conexion.connect();
-	const dbo = conexion.db(db);
+// Crea la tabla
+function crearTabla(datosTabla) {
+	let contenido = "";
+	for (let i = 0; i < datosTabla.length; i++) {
+		let { image, name, species, gender, house, yearOfBirth, _id } = datosTabla[i];
 
-	let salida = "";
-	let resultado = await dbo.collection(collection).find({}).toArray();
-	salida = crearHTML(resultado);
-	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-	respuesta.write(salida);
-	respuesta.end();
-}
-
-// Consultar Filtro 1 (Humanos)
-async function consultarF1(db, collection, respuesta) {
-	await conexion.connect();
-	const dbo = conexion.db(db);
-
-	let salida = "";
-	let resultado = await dbo.collection(collection).find({ species: "human" }).toArray();
-	salida = crearHTML(resultado);
-	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-	respuesta.write(salida);
-	respuesta.end();
-}
-
-// Consultar Filtro 2 (< 1979)
-async function consultarF2(db, collection, respuesta) {
-	await conexion.connect();
-	const dbo = conexion.db(db);
-
-	let salida = "";
-	let resultado = await dbo
-		.collection(collection)
-		.find({ yearOfBirth: { $lt: 1979 } })
-		.toArray();
-	salida = crearHTML(resultado);
-	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-	respuesta.write(salida);
-	respuesta.end();
-}
-
-// Consultar Filtro 3 (Holly)
-async function consultarF3(db, collection, respuesta) {
-	await conexion.connect();
-	const dbo = conexion.db(db);
-
-	let salida = "";
-	let resultado = await dbo.collection(collection).find({ "wand.wood": "holly" }).toArray();
-	salida = crearHTML(resultado);
-	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-	respuesta.write(salida);
-	respuesta.end();
-}
-
-// Consultar Filtro 4 (Estudiantes vivos)
-async function consultarF4(db, collection, respuesta) {
-	await conexion.connect();
-	const dbo = conexion.db(db);
-
-	let salida = "";
-	let resultado = await dbo
-		.collection(collection)
-		.find({ $and: [{ alive: true }, { hogwartsStudent: true }] })
-		.toArray();
-	salida = crearHTML(resultado);
-	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-	respuesta.write(salida);
-	respuesta.end();
-}
-
-// Borrar
-async function borrarRegistro() {
-	await conexion.connect();
-	const dbo = conexion.db(db);
-
-	let filtro = {};
-	let resultado = await dbo.collection(collection).deleteOne(filtro); // .updateMany para todos los registros
-	console.log(resultado);
-}
-
-function crearHTML(datosTabla) {
-	let contenido = `<html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-            <title>Práctica Tema 4 DWS</title>
-        </head>
-        <body>
-            <div class="container-fluid">
-				<h1 class="text-center pt-5 pb-2">Práctica Tema 4 DWS</h1>
-				<h3 class="text-center pb-4" style="opacity:.7;color:crimson;">Personajes Harry Potter</h3>
-				<div class="container text-center">
-					<a class="btn btn-success" href="/consultar">Todos</a>
-					<a class="btn btn-success" href="/humanos">Humanos</a>
-					<a class="btn btn-success" href="/anioDeNacimiento">< 1979</a>
-					<a class="btn btn-success" href="/holly">Holly</a>
-					<a class="btn btn-success" href="/estudiantesVivos">Estudiantes vivos</a>
-				</div>
-                <div class="container py-5">
-                    <table class="table">
-                    <thead>
-                    <tr>
-                        <th>Imagen</th>
-                        <th>Nombre</th>
-                        <th>Especie</th>
-                        <th>Género</th>
-                        <th>Casa</th>
-                        <th>Año Nacimiento</th>
-						<th>Borrar</th></tr>
-                    </thead>
-                    <tbody>`;
-
-	for (i = 0; i < datosTabla.length; i++) {
-		let imagen = "";
-		let nombre = "";
-		let especie = "";
-		let genero = "";
-		let casa = "";
-		let anoNacimiento = 0;
-
-		if (datosTabla[i].image != null) {
-			imagen = datosTabla[i].image;
-		}
-		if (datosTabla[i].name != null) {
-			nombre = datosTabla[i].name;
-		}
-		if (datosTabla[i].species != null) {
-			especie = datosTabla[i].species;
-		}
-		if (datosTabla[i].gender != null) {
-			genero = datosTabla[i].gender;
-		}
-		if (datosTabla[i].house != null) {
-			casa = datosTabla[i].house;
-		}
-		if (datosTabla[i].yearOfBirth != null) {
-			anoNacimiento = datosTabla[i].yearOfBirth;
-		}
-
-		contenido += `<tr>
-        	<td>${imagen}</td>
-        	<td>${nombre}</td>
-        	<td>${especie}</td>
-        	<td>${genero}</td>
-        	<td>${casa}</td>
-        	<td>${anoNacimiento}</td>
-        	<td><a class="btn btn-danger btn-sm">Borrar</a></td>
-    	</tr>`;
+		contenido += `
+      <tr>
+        <td>${image || ""}</td>
+        <td>${name || ""}</td>
+        <td>${species || ""}</td>
+        <td>${gender || ""}</td>
+        <td>${house || ""}</td>
+        <td>${yearOfBirth || ""}</td>
+        <td>
+        <button class="btn btn-danger btn-sm" onclick="eliminarRegistro('${_id}')">
+          Borrar
+        </button>
+        </td>
+      </tr>`;
 	}
-
-	contenido += `      </tbody>
-                    </table>
-                </div>
-            </div>
-        </body>
-    </html>`;
-
 	return contenido;
 }
+
+// Consulta los registros
+async function mostrarTodo(db, collection, respuesta, filtro) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+
+	let salida = "";
+	let query = filtro ? filtro : {};
+	let resultado = await dbo.collection(collection).find(query).toArray();
+
+	salida = crearTabla(resultado);
+	respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+	respuesta.write(salida);
+	respuesta.end();
+}
+
+// Filtros
+async function filtroBasico(atributo, valor, respuesta) {
+	let filtro = { [atributo]: valor };
+	await mostrarTodo(db, collection, respuesta, filtro);
+}
+
+async function filtroComplejo(respuesta) {
+	let filtro = { alive: true, hogwartsStudent: true };
+	await mostrarTodo(db, collection, respuesta, filtro);
+}
+
+// Elimina un personaje
+async function eliminarPersonaje(id, respuesta) {
+	await conexion.connect();
+	const dbo = conexion.db(db);
+
+	await dbo.collection(collection).deleteOne({ _id: new ObjectId(id) });
+	await mostrarTodo(db, collection, respuesta);
+}
+
+// Agrega un personaje
+async function eliminarPersonaje(nuevoPersonaje, respuesta) {
+	try {
+		await conexion.connect();
+		const dbo = conexion.db(db);
+		await dbo.collection(collection).insertOne(nuevoPersonaje);
+		respuesta.writeHead(200, { "Content-Type": "application/json" });
+		respuesta.end(JSON.stringify({ message: "Personaje agregado correctamente" }));
+	} catch (error) {
+		respuesta.writeHead(500, { "Content-Type": "application/json" });
+		respuesta.end(JSON.stringify({ error: "Error al agregar el nuevo personaje" }));
+	}
+}
+
+server.listen(8080, "localhost");
+console.log("Servidor corriendo: 8080");
