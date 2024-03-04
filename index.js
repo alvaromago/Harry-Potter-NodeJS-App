@@ -79,7 +79,7 @@ server.on("request", async function (peticion, respuesta) {
 		});
 		peticion.on("end", () => {
 			const nuevoPersonaje = JSON.parse(datos);
-			eliminarPersonaje(nuevoPersonaje, respuesta);
+			insertarPersonaje(nuevoPersonaje, respuesta);
 		});
 	} else {
 		respuesta.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
@@ -164,7 +164,7 @@ async function eliminarPersonaje(id, respuesta) {
 }
 
 // Agrega un personaje
-async function eliminarPersonaje(nuevoPersonaje, respuesta) {
+async function insertarPersonaje(nuevoPersonaje, respuesta) {
 	try {
 		await conexion.connect();
 		const dbo = conexion.db(db);
